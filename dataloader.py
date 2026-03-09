@@ -27,5 +27,4 @@ def get_dvs128_dataloader(
         num_workers=num_workers
     )
 
-    return dataset
-    
+    return dataset ,dataloader

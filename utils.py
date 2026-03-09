@@ -6,28 +6,29 @@ from matplotlib.animation import FuncAnimation
 import torch
 
 def inject_label_conv(input_seq, label, num_classes):
-    """
-    input_seq: [T, B, C, H, W]
-    label:     [B]
-    returns:   [T, B, C+num_classes, H, W]
-    """
+    if not torch.is_tensor(input_seq):
+        input_seq = torch.from_numpy(input_seq).float()
+        
+    T, C, H, W = input_seq.shape
+   
+    # 1. Build one-hot vector → [num_classes]
+    one_hot = torch.zeros(num_classes)
+    one_hot[label] = 1.0
+    output = input_seq.clone()
+    one_hot_expanded = one_hot.view(1, 1, 1, num_classes)
+    one_hot_expanded = one_hot_expanded.expand(T, C, H, num_classes)
+    output[:, :, :, :num_classes] = one_hot_expanded
+    
 
-    T, B, C, H, W = input_seq.shape
-    device = input_seq.device
+    return output # [T, C, H, W] unchanged shape
 
-    # One-hot
-    one_hot = torch.zeros(B, num_classes, device=device)
-    one_hot[torch.arange(B), label] = 1.0
+def get_negative_label(label, num_classes):
+    negative = torch.randint(0, num_classes - 1, (1,)).item()
+    if negative >= label:
+        negative += 1   # shift to skip the true class
+    return negative
 
-    # Expand spatially
-    label_map = one_hot.view(B, num_classes, 1, 1)
-    label_map = label_map.expand(B, num_classes, H, W)
 
-    # Repeat across time
-    label_map = label_map.unsqueeze(0).repeat(T, 1, 1, 1, 1)
-
-    # Concatenate on channel dimension
-    return torch.cat([input_seq, label_map], dim=2)
 
 def spike_count_goodness(spike_record):
     """
